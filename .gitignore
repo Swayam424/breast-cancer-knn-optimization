@@ -1,0 +1,16 @@
+# Python & environment artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+.venv/
+env/
+
+# Secret internal team files (DO NOT PUSH TO GITHUB)
+VIVA_PREP_GUIDE.md
+PRESENTATION_SLIDES.md
+
+# Local-only tools & redundant drafts
+interactive_demo.html
+breast_cancer_knn.py
+PROJECT_RESEARCH_PAPER.md
