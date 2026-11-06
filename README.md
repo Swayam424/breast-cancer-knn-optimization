@@ -1,118 +1,150 @@
-# 🏥 Diagnostic Oncology: Systematic Optimization of K-Nearest Neighbors via Differentiable Metric Learning and Clinical Cost-Sensitive Fusion
+<div align="center">
+
+# K-Nearest Neighbours for Breast Cancer Diagnosis
+
+Implementing, optimising and stress-testing K-NN on the Wisconsin Diagnostic Breast Cancer dataset
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Swayam424/breast-cancer-knn-optimization/blob/master/KNN_Breast_Cancer_Diagnosis.ipynb)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-red.svg)](https://pytorch.org/)
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-K--NN-F7931E)
+![PyTorch](https://img.shields.io/badge/PyTorch-Soft--KNN-EE4C2C)
 
-This repository contains the complete source code, experimental ledger, and academic research paper for our systematic optimization study of the **K-Nearest Neighbors (K-NN)** algorithm on the **Wisconsin Diagnostic Breast Cancer (WDBC)** dataset (569 biopsy patients, 30 continuous cellular features).
+**[Read the project report (PDF)](reports/KNN_Project_Report.pdf)** · **[Open the notebook](KNN_Breast_Cancer_Diagnosis.ipynb)**
 
----
+</div>
 
-## 📌 Abstract
+## Overview
 
-The $k$-nearest-neighbours rule is among the most transparent non-parametric classifiers. In diagnostic oncology, however, classical KNN faces structural challenges: raw feature scales distort distance calculations, hard majority voting prevents gradient-based optimization, and symmetric loss treats life-threatening false negatives identically to false positives. 
+Can a simple, explainable classifier tell malignant tumours from benign ones using measurements of cell nuclei? This project, built for the ML Theory assignment, answers that with K-NN and examines which optimisations genuinely help.
 
-We introduce a four-stage optimization ladder:
-1. **Classical Foundations:** Canonical distance benchmarks ($L_2$, $L_1$, Cosine, Mahalanobis) and 60-epoch bias-variance sweeps.
-2. **Spectral Compression & SIMD Vectorization:** PCA dimensionality reduction (95.3% variance at $d=10$) coupled with multidimensional NumPy tensor broadcasting yielding a **122× wall-clock inference acceleration**.
-3. **Differentiable Soft-KNN:** Formulating a temperature-scaled softmax objective over negative anchor distances, enabling end-to-end backpropagation via AdamW and SGD with Nesterov momentum.
-4. **Clinical Cost Calibration:** Calibrating decision thresholds ($3/7$ safety rule) to eliminate fatal missed cancers, demonstrated on **Patient #35** (a confirmed malignant cancer missed by standard majority voting).
-5. **Convex Fusion:** A validation-guided simplex ensemble consolidating all stages to achieve **97.37% test accuracy with 97.6% malignant recall**.
+The two possible errors are not equally serious: a false alarm leads to further tests, while a missed cancer delays treatment. Results therefore report **malignant recall** alongside accuracy.
 
----
+| Finding | Result |
+| :--- | :--- |
+| Expected accuracy, K-NN with k=7 (repeated 5-fold CV) | **96.55% ± 1.61** |
+| Accuracy on the held-out test split, k=7 | **97.37%** |
+| Malignant recall with the 3-of-7 safety rule | **95.24%** (2 of 42 cancers missed, 6 false alarms) |
+| Fewest missed cancers: 3-seed Soft-KNN ensemble | **97.62% recall** (1 missed, 4 false alarms) |
 
-## 📁 Repository Structure
+> This is a coursework study on a small benchmark dataset. It is not a medical device and must not guide patient care.
 
-```
-├── README.md                           # GitHub documentation with abstract, leaderboard & methodology
-├── KNN_Breast_Cancer_Diagnosis.ipynb   # Main Google Colab Notebook (1-click reproducible)
-├── PROJECT_RESEARCH_PAPER.pdf          # Full publication-grade research paper (NeurIPS / IEEE format)
-├── paper.tex                           # Complete LaTeX source code
-├── results_ledger.json                 # Machine-readable 15-experiment results database
-├── figures/                            # Publication-quality vector figures
-│   ├── fig1_pca_energy.png             # PCA Cumulative Spectral Energy Curve
-│   ├── fig2_vectorization_benchmark.png# 122× SIMD Vectorization Benchmark
-│   ├── fig3_loss_accuracy_dual.png     # Loss Function vs Accuracy Curves (Overfitting/Underfitting)
-│   ├── fig4_confusion_matrices.png     # Default 4/7 vs Safety 3/7 Confusion Matrices
-│   └── fig5_optimizer_dynamics.png     # PyTorch AdamW vs SGD Training Loss Curves
-└── .gitignore                          # Standard git exclusion
-```
+## Dataset
 
----
+[Wisconsin Diagnostic Breast Cancer](https://archive.ics.uci.edu/dataset/17/breast+cancer+wisconsin+diagnostic) (also on [Kaggle](https://www.kaggle.com/datasets/uciml/breast-cancer-wisconsin-data)): 569 samples, 357 benign and 212 malignant, with 30 continuous features. The code loads the same data through scikit-learn, so no download is needed.
 
-## 📊 Key Results & Visualizations
+## Method
 
-### 1. Cumulative Spectral Energy & SIMD Vectorization
-| PCA Explained Variance | 122× Vectorization Acceleration |
-| :---: | :---: |
-| ![Figure 1: PCA Spectral Energy](figures/fig1_pca_energy.png) | ![Figure 2: Vectorization Benchmark](figures/fig2_vectorization_benchmark.png) |
+1. **Split** the data 80/20 with stratification (seed 42), holding out 114 test samples.
+2. **Standardise** features using training statistics only.
+3. **Compare distance metrics:** Euclidean, Manhattan, cosine and Mahalanobis.
+4. **Tune** `k` from 1 to 25 and compress features with PCA.
+5. **Optimise** with Soft-KNN, a differentiable variant trained by backpropagation, comparing optimisers, activations and augmentation.
+6. **Calibrate** the malignant vote threshold and evaluate the trade-off.
 
-### 2. Dual Curves: Accuracy vs Zero-One Loss
-![Figure 3: Loss and Accuracy Curves](figures/fig3_loss_accuracy_dual.png)
+## Results
 
-### 3. Clinical Decision Calibration: Saving Patient #35
-| Default Majority Rule (4/7) | Safety-Tuned Clinical Rule (3/7) |
-| :---: | :---: |
-| ![Figure 4: Confusion Matrices](figures/fig4_confusion_matrices.png) |
+| Configuration | Test accuracy | Malignant recall | Macro F1 | Missed cancers | False alarms |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| Euclidean, k=5 | 95.61% | 92.86% | 0.9526 | 3 | 2 |
+| Manhattan, k=5 | 96.49% | 92.86% | 0.9619 | 3 | 1 |
+| Cosine, k=5 | 95.61% | 92.86% | 0.9526 | 3 | 2 |
+| Mahalanobis, k=5 | 81.58% | 50.00% | 0.7697 | 21 | 0 |
+| **Euclidean, k=7** | **97.37%** | 92.86% | **0.9713** | 3 | 0 |
+| PCA d=2, k=7 | 92.11% | 90.48% | 0.9156 | 4 | 5 |
+| PCA d=6, k=7 | 96.49% | 95.24% | 0.9623 | 2 | 2 |
+| Euclidean, k=7, 3-of-7 rule | 92.98% | 95.24% | 0.9260 | 2 | 6 |
+| Soft-KNN ensemble (3 seeds) | 95.61% | **97.62%** | 0.9535 | 1 | 4 |
 
----
+One test sample moves accuracy by 0.88 points, and the 95% margin around 97% is about ±3.1 points, so small differences here are not meaningful.
 
-## 🏆 Master Progression Leaderboard
+## Optimisation
 
-All experiments are logged in `results_ledger.json`:
+Neural results are averaged over 10 seeds, because a single run can mislead.
 
-| # | Paradigm | Technique | Test Acc | Malignant Recall | Macro F1 | Query Latency |
-| :---: | :--- | :--- | :---: | :---: | :---: | :---: |
-| **E01** | Classical KNN | Raw 30-D, Euclidean ($L_2$), $k=5$ | 95.61% | 92.86% | 0.9526 | 1974.8 ms |
-| **E02** | Classical KNN | Raw 30-D, Manhattan ($L_1$), $k=5$ | 96.49% | 92.86% | 0.9619 | 5.11 ms |
-| **E03** | Classical KNN | Raw 30-D, Cosine Similarity, $k=5$ | 95.61% | 92.86% | 0.9526 | 5.99 ms |
-| **E05** | PCA-KNN | PCA $d=2$ (63.4% var), $k=7$ | 92.11% | 90.48% | 0.9156 | 8.02 ms |
-| **E06** | PCA-KNN | PCA $d=6$ (89.1% var), $k=7$ | 96.49% | 95.24% | 0.9623 | 2.46 ms |
-| **E07** | PCA-KNN | PCA $d=10$ (95.3% var operating point) | 95.61% | 92.86% | 0.9526 | 3.76 ms |
-| **E09** | Vectorized Scratch | NumPy SIMD Tensor Broadcasting, $k=7$ | **97.37%** | 92.86% | **0.9713** | **16.18 ms (122× faster)** |
-| **E10** | Differentiable Soft-KNN | Metric Head + AdamW ($\tau=0.1$, ReLU) | 96.49% | **97.62%** | 0.9627 | 31.67 ms |
-| **E11** | Differentiable Soft-KNN | Metric Head + SGD Momentum ($\tau=0.1$) | 95.61% | 95.24% | 0.9531 | 4.11 ms |
-| **E13** | Clinical Cost Tuning | Safety-Tuned Threshold (3/7 votes) | 92.98% | **95.24% (Catches Patient #35)** | 0.9260 | **0.02 ms** |
-| **E14** | Ensemble & Fusion | 3-Seed Soft-KNN Ensemble (42/7/123) | 95.61% | **97.62%** | 0.9535 | 2.10 ms |
-| **E15** | Grand Champion | Convex Simplex Fusion (Soft-KNN + PCA + $L_2$) | **97.37%** | **95.24%** | **0.9713** | 9.13 ms |
+| Technique | Setting | Test accuracy | Malignant recall |
+| :--- | :--- | ---: | ---: |
+| Optimiser | AdamW | 95.53% ± 0.92 | 96.43% |
+| | SGD + momentum | 95.18% ± 1.13 | 95.24% |
+| | SGD, no momentum | 94.04% ± 1.75 | 93.57% |
+| Activation | GELU (AdamW) | 95.53% ± 0.92 | 96.43% |
+| | ReLU (AdamW) | 95.18% ± 0.71 | 95.71% |
+| Regularisation | Early stopping, epoch 9 | 95.26% ± 1.05 | 95.00% |
+| Augmentation (K-NN) | Gaussian jitter, std 0.3 | 96.23% ± 0.79 | 92.86% |
 
----
+- **Tuned variants rarely beat the baseline.** The classes are well separated, so most differences fall within noise.
+- **The practical gain is clinical.** Lowering the vote threshold catches one more cancer, at the cost of six false alarms.
+- **Code speed improves cleanly.** NumPy broadcasting gives identical predictions about 22× faster than Python loops on the test machine.
 
-## ❌ Honest Negative Results (Table 5)
+## Loss and accuracy
 
-Reporting negative outcomes establishes true scientific validity:
+**K-NN across `k`.** K-NN has no epochs, so loss is zero-one loss plotted against `k`.
 
-| Technique Attempted | Test Accuracy | Impact ($\Delta$) | Primary Cause of Degradation |
-| :--- | :---: | :---: | :--- |
-| **Mahalanobis Covariance Inversion** | 81.58% | **$-14.03\%$** | Severe collinearity ($r > 0.98$ across radius/area) induces numerical instability in covariance inversion. |
-| **High Gaussian Jittering (std = 0.3)** | 88.60% | **$-8.77\%$** | Perturbs delicate cell nucleus concavity and smoothness margins essential for borderline discrimination. |
-| **SGD without Momentum** | 91.23% | **$-6.14\%$** | Oscillates on the non-convex metric loss landscape without escaping saddle points. |
-| **Extreme PCA Compression ($d=2$)** | 92.11% | **$-5.26\%$** | Discards 37% of morphological variance, merging malignant and benign cluster boundaries. |
-| **Excessive Smoothing ($k=25$)** | 94.74% | **$-2.63\%$** | High-bias underfitting; averages over adjacent benign tissue neighborhoods. |
+![K-NN loss and accuracy across k](reports/figures/k_sweep_loss_accuracy.png)
 
----
+**Soft-KNN across epochs.** Curves use a validation split carved from the training data.
 
-## 🚀 How to Run
+![Soft-KNN loss and accuracy across epochs](reports/figures/softknn_loss_accuracy.png)
 
-### 1. In Google Colab
-1. Open [Google Colab](https://colab.research.google.com/).
-2. Upload `KNN_Breast_Cancer_Diagnosis.ipynb`.
-3. Select **Runtime → Run All** (under 2 minutes on standard CPU).
+## Overfitting and underfitting
 
-### 2. Locally
+| Model | Training | Validation | Diagnosis |
+| :--- | ---: | ---: | :--- |
+| K-NN, k=1 | 100.00% | 94.73% | **Overfitting:** memorises noise, 5.27-point gap |
+| K-NN, k=7 | 97.31% | 96.26% | **Balanced:** 1.04-point gap, near the validation plateau |
+| K-NN, k=25 | 95.99% | 95.16% | **Mild underfitting:** both scores fall as bias rises |
+| Soft-KNN, 200 epochs | 100.00% | 97.14% | **Overfitting:** validation loss climbs from 0.086 to 0.156 as training loss nears zero |
+
+## Clinical threshold
+
+![Confusion matrices for the default and safety rules](reports/figures/confusion_thresholds.png)
+
+Test patient #35 has a malignant tumour and receives 3 of 7 malignant votes, so the default rule misses it and the safety rule catches it. Two other cancers still go undetected. The threshold was examined on the test split, so this result is illustrative; a real deployment would select it on separate validation data with clinical input.
+
+## Run it
+
+**Google Colab:** select the badge above, upload `results_ledger.json` to the session (the last cell reads it), then choose **Runtime → Run all**.
+
+**Reproduce the report:**
+
 ```bash
 git clone https://github.com/Swayam424/breast-cancer-knn-optimization.git
 cd breast-cancer-knn-optimization
-pip install numpy pandas matplotlib seaborn torch scikit-learn
-python breast_cancer_knn.py
+pip install -r requirements.txt
+python reports/analysis.py        # recomputes results and charts
+python reports/build_report.py    # rebuilds the PDF
 ```
 
----
+## Repository structure
 
-## 👥 Authors
-- **Swayam Mallick** (Project Lead)
-- **Krishnendu Dhar**
-- **Rwitama Aon**
-- **Pragati Kumari**
-- **Institution:** Techno India University, West Bengal (Batch: BCS 3B)
+```text
+├── KNN_Breast_Cancer_Diagnosis.ipynb   Main Colab notebook
+├── reports/
+│   ├── KNN_Project_Report.pdf          Project report
+│   ├── analysis.py                     Recomputes every reported result
+│   ├── build_report.py                 Builds the PDF
+│   ├── results_verified.json           Verified results
+│   └── figures/                        Report charts
+├── PROJECT_RESEARCH_PAPER.pdf          Earlier team paper
+├── paper.tex                           LaTeX source of the earlier paper
+├── results_ledger.json                 Original experiment log
+├── figures/                            Original notebook figures
+└── requirements.txt                    Python dependencies
+```
+
+## Notes and limitations
+
+- **Verified numbers:** this README and the report use `reports/results_verified.json`. Some figures in the earlier paper and `results_ledger.json` differ; [Appendix A of the report](reports/KNN_Project_Report.pdf) lists each one.
+- **Convex fusion (E15):** the earlier paper reports this model, but the repository has no implementation of it, so it is excluded here.
+- **Evaluation:** the data is small and from a single source, and the test split informed several comparisons. Repeated cross-validation is the fairest estimate.
+
+## Team
+
+**Swayam Mallick** (Project Lead) · **Krishnendu Dhar** · **Rwitama Aon** · **Pragati Kumari**
+
+Techno India University, West Bengal · Batch BCS 3B
+
+## References
+
+- W. H. Wolberg, W. N. Street, O. L. Mangasarian. *Breast Cancer Wisconsin (Diagnostic)*. UCI Machine Learning Repository, 1995.
+- T. Cover, P. Hart. *Nearest neighbor pattern classification*. IEEE Transactions on Information Theory, 1967.
+- J. Goldberger et al. *Neighbourhood components analysis*. NeurIPS, 2004.
